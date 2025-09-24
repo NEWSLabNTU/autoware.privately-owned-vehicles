@@ -5,6 +5,7 @@
 #include <fstream>
 #include <vector>
 #include <random>
+#include <optional>
 #include <yaml-cpp/yaml.h>
 #include <Eigen/Dense>
 #include <filesystem>
