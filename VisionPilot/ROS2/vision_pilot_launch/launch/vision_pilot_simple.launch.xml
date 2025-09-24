@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Simple VisionPilot launch with minimal web interface -->
+
+  <!-- Launch Arguments -->
+  <arg name="video_path" description="Path to the video file for sensor input"/>
+  <arg name="pipeline" default="scene_seg" description="Pipeline: scene_seg, domain_seg, or scene_3d"/>
+
+  <!-- Include the main VisionPilot pipeline -->
+  <include file="$(find-pkg-share models)/launch/run_pipeline.launch.py">
+    <arg name="video_path" value="$(var video_path)"/>
+    <arg name="pipeline" value="$(var pipeline)"/>
+  </include>
+
+  <!-- Add Foxglove Bridge for web access -->
+  <node pkg="foxglove_bridge" exec="foxglove_bridge" name="foxglove_bridge">
+    <param name="port" value="8765"/>
+    <param name="address" value="0.0.0.0"/>
+    <param name="use_sim_time" value="false"/>
+  </node>
+
+  <!-- Add Web Video Server -->
+  <node pkg="web_video_server" exec="web_video_server" name="web_video_server">
+    <param name="port" value="8080"/>
+    <param name="address" value="0.0.0.0"/>
+  </node>
+
+</launch>

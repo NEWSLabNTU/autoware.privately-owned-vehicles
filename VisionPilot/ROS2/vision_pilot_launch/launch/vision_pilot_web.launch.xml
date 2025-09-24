@@ -1,0 +1,125 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Launch Arguments -->
+  <arg name="video_path" description="Path to the video file for sensor input"/>
+  <arg name="pipeline" default="scene_seg" description="Which pipeline to run: scene_seg, domain_seg, or scene_3d"/>
+  <arg name="enable_foxglove" default="true" description="Enable Foxglove bridge"/>
+  <arg name="enable_web_video" default="true" description="Enable web video server"/>
+  <arg name="enable_rosbridge" default="false" description="Enable rosbridge server"/>
+  <arg name="foxglove_port" default="8765" description="Foxglove bridge port"/>
+  <arg name="web_video_port" default="8080" description="Web video server port"/>
+  <arg name="rosbridge_port" default="9090" description="ROSBridge websocket port"/>
+
+  <!-- VisionPilot Core Pipeline -->
+  <group>
+    <push-ros-namespace namespace="vision_pilot"/>
+
+    <!-- Video Publisher Node (Sensor Input) -->
+    <node pkg="sensors" exec="video_publisher_node_exe" name="video_publisher">
+      <param name="video_path" value="$(var video_path)"/>
+      <param name="output_topic" value="/sensors/video/image_raw"/>
+      <param name="loop" value="true"/>
+    </node>
+
+    <!-- Scene Segmentation Pipeline -->
+    <group if="$(eval '&quot;$(var pipeline)&quot; == &quot;scene_seg&quot;')">
+      <node pkg="models" exec="models_node_exe" name="scene_seg_model">
+        <param from="$(find-pkg-share models)/config/autoseg.yaml"/>
+        <remap from="/sensors/video/image_raw" to="/sensors/video/image_raw"/>
+        <remap from="/autoseg/scene_seg/mask" to="/autoseg/scene_seg/mask"/>
+      </node>
+
+      <node pkg="visualization" exec="visualize_masks_node_exe" name="scene_seg_viz">
+        <param name="image_topic" value="/sensors/video/image_raw"/>
+        <param name="mask_topic" value="/autoseg/scene_seg/mask"/>
+        <param name="viz_type" value="scene"/>
+        <param name="output_topic" value="/autoseg/scene_seg/viz"/>
+      </node>
+    </group>
+
+    <!-- Domain Segmentation Pipeline -->
+    <group if="$(eval '&quot;$(var pipeline)&quot; == &quot;domain_seg&quot;')">
+      <node pkg="models" exec="models_node_exe" name="domain_seg_model">
+        <param from="$(find-pkg-share models)/config/autoseg.yaml"/>
+        <remap from="/sensors/video/image_raw" to="/sensors/video/image_raw"/>
+        <remap from="/autoseg/domain_seg/mask" to="/autoseg/domain_seg/mask"/>
+      </node>
+
+      <node pkg="visualization" exec="visualize_masks_node_exe" name="domain_seg_viz">
+        <param name="image_topic" value="/sensors/video/image_raw"/>
+        <param name="mask_topic" value="/autoseg/domain_seg/mask"/>
+        <param name="viz_type" value="domain"/>
+        <param name="output_topic" value="/autoseg/domain_seg/viz"/>
+      </node>
+    </group>
+
+    <!-- Scene 3D (Depth Estimation) Pipeline -->
+    <group if="$(eval '&quot;$(var pipeline)&quot; == &quot;scene_3d&quot;')">
+      <node pkg="models" exec="models_node_exe" name="scene3d_model">
+        <param from="$(find-pkg-share models)/config/auto3d.yaml"/>
+        <remap from="/sensors/video/image_raw" to="/sensors/video/image_raw"/>
+        <remap from="/auto3d/scene_3d/depth_map" to="/auto3d/scene_3d/depth_map"/>
+      </node>
+
+      <node pkg="visualization" exec="visualize_depth_node_exe" name="scene3d_viz">
+        <param name="depth_topic" value="/auto3d/scene_3d/depth_map"/>
+        <param name="output_topic" value="/auto3d/scene_3d/viz"/>
+      </node>
+    </group>
+  </group>
+
+  <!-- Web Interface Services -->
+  <group>
+    <push-ros-namespace namespace="web_services"/>
+
+    <!-- Foxglove Bridge for WebSocket connectivity -->
+    <node pkg="foxglove_bridge" exec="foxglove_bridge" name="foxglove_bridge" if="$(var enable_foxglove)">
+      <param name="port" value="$(var foxglove_port)"/>
+      <param name="address" value="0.0.0.0"/>
+      <param name="tls" value="false"/>
+      <param name="certfile" value=""/>
+      <param name="keyfile" value=""/>
+      <param name="topic_whitelist" value="['/sensors/video/image_raw', '/autoseg/.*/mask', '/autoseg/.*/viz', '/auto3d/.*/depth_map', '/auto3d/.*/viz']"/>
+      <param name="use_sim_time" value="false"/>
+    </node>
+
+    <!-- Web Video Server for HTTP video streaming -->
+    <node pkg="web_video_server" exec="web_video_server" name="web_video_server" if="$(var enable_web_video)">
+      <param name="port" value="$(var web_video_port)"/>
+      <param name="address" value="0.0.0.0"/>
+      <param name="default_stream_type" value="mjpeg"/>
+      <param name="ros_threads" value="2"/>
+    </node>
+
+    <!-- ROSBridge Server (optional, for custom web interfaces) -->
+    <node pkg="rosbridge_server" exec="rosbridge_websocket" name="rosbridge_server" if="$(var enable_rosbridge)">
+      <param name="port" value="$(var rosbridge_port)"/>
+      <param name="address" value="0.0.0.0"/>
+      <param name="retry_startup_delay" value="5"/>
+      <param name="fragment_timeout" value="600"/>
+      <param name="delay_between_messages" value="0"/>
+      <param name="max_message_size" value="10000000"/>
+    </node>
+  </group>
+
+  <!-- Image Transport Republisher for better web streaming performance -->
+  <group>
+    <!-- Republish raw images as compressed for better web performance -->
+    <node pkg="image_transport" exec="republish" name="image_compressor"
+          args="raw in:=/sensors/video/image_raw compressed out:=/sensors/video/image_compressed"/>
+
+    <!-- Republish visualization outputs as compressed -->
+    <node pkg="image_transport" exec="republish" name="viz_compressor_scene"
+          args="raw in:=/autoseg/scene_seg/viz compressed out:=/autoseg/scene_seg/viz_compressed"
+          if="$(eval '&quot;$(var pipeline)&quot; == &quot;scene_seg&quot;')"/>
+
+    <node pkg="image_transport" exec="republish" name="viz_compressor_domain"
+          args="raw in:=/autoseg/domain_seg/viz compressed out:=/autoseg/domain_seg/viz_compressed"
+          if="$(eval '&quot;$(var pipeline)&quot; == &quot;domain_seg&quot;')"/>
+
+    <node pkg="image_transport" exec="republish" name="viz_compressor_3d"
+          args="raw in:=/auto3d/scene_3d/viz compressed out:=/auto3d/scene_3d/viz_compressed"
+          if="$(eval '&quot;$(var pipeline)&quot; == &quot;scene_3d&quot;')"/>
+  </group>
+
+</launch>
