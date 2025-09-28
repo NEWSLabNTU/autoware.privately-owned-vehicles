@@ -1,0 +1,3 @@
+[submodule "Scene3D/create_metric_depth/DDAD/dgp"]
+	path = Scene3D/create_metric_depth/DDAD/dgp
+	url = https://github.com/TRI-ML/dgp.git
