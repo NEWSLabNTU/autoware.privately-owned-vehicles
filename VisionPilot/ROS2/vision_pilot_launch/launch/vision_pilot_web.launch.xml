@@ -12,7 +12,7 @@
 
   <!-- VisionPilot Core Pipeline -->
   <group>
-    <push-ros-namespace namespace="vision_pilot"/>
+    <!-- <push-ros-namespace namespace="vision_pilot"/> -->
 
     <!-- Video Publisher Node (Sensor Input) -->
     <node pkg="sensors" exec="video_publisher_node_exe" name="video_publisher">
@@ -70,7 +70,7 @@
 
   <!-- Web Interface Services -->
   <group>
-    <push-ros-namespace namespace="web_services"/>
+    <!-- <push-ros-namespace namespace="web_services"/> -->
 
     <!-- Foxglove Bridge for WebSocket connectivity -->
     <node pkg="foxglove_bridge" exec="foxglove_bridge" name="foxglove_bridge" if="$(var enable_foxglove)">
