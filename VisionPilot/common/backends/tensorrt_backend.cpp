@@ -123,7 +123,49 @@ void TensorRTBackend::buildEngineFromOnnx(
   if (!parser->parseFromFile(onnx_path.c_str(), static_cast<int>(nvinfer1::ILogger::Severity::kWARNING))) {
     throw std::runtime_error("Failed to parse ONNX file.");
   }
-  
+
+  // Check for dynamic dimensions and create optimization profile if needed
+  for (int i = 0; i < network->getNbInputs(); ++i) {
+    auto* input = network->getInput(i);
+    auto dims = input->getDimensions();
+
+    bool has_dynamic_dim = false;
+    for (int d = 0; d < dims.nbDims; ++d) {
+      if (dims.d[d] == -1) {
+        has_dynamic_dim = true;
+        RCLCPP_INFO(rclcpp::get_logger("tensorrt_backend"),
+                    "Dynamic dimension detected in input '%s' at dimension %d",
+                    input->getName(), d);
+        break;
+      }
+    }
+
+    if (has_dynamic_dim) {
+      auto* profile = builder->createOptimizationProfile();
+
+      // Set all dimensions to fixed batch=1 for min/opt/max
+      nvinfer1::Dims fixedDims = dims;
+      for (int d = 0; d < fixedDims.nbDims; ++d) {
+        if (fixedDims.d[d] == -1) {
+          fixedDims.d[d] = 1;  // Fix batch size to 1
+        }
+      }
+
+      profile->setDimensions(input->getName(),
+                            nvinfer1::OptProfileSelector::kMIN, fixedDims);
+      profile->setDimensions(input->getName(),
+                            nvinfer1::OptProfileSelector::kOPT, fixedDims);
+      profile->setDimensions(input->getName(),
+                            nvinfer1::OptProfileSelector::kMAX, fixedDims);
+
+      config->addOptimizationProfile(profile);
+
+      RCLCPP_INFO(rclcpp::get_logger("tensorrt_backend"),
+                  "Created optimization profile with batch size = 1");
+      break;  // Only need one profile for all inputs
+    }
+  }
+
   config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE, 1 << 30);
   
   if (precision == "fp16" && builder->platformHasFastFp16()) {
