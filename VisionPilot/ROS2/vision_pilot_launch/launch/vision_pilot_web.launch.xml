@@ -106,19 +106,19 @@
   <group>
     <!-- Republish raw images as compressed for better web performance -->
     <node pkg="image_transport" exec="republish" name="image_compressor"
-          args="raw in:=/sensors/video/image_raw compressed out:=/sensors/video/image_compressed"/>
+          args="raw compressed --ros-args --remap in:=/sensors/video/image_raw --remap out:=/sensors/video/image_compressed"/>
 
     <!-- Republish visualization outputs as compressed -->
     <node pkg="image_transport" exec="republish" name="viz_compressor_scene"
-          args="raw in:=/autoseg/scene_seg/viz compressed out:=/autoseg/scene_seg/viz_compressed"
+          args="raw compressed --ros-args --remap in:=/autoseg/scene_seg/viz --remap out:=/autoseg/scene_seg/viz_compressed"
           if="$(eval '&quot;$(var pipeline)&quot; == &quot;scene_seg&quot;')"/>
 
     <node pkg="image_transport" exec="republish" name="viz_compressor_domain"
-          args="raw in:=/autoseg/domain_seg/viz compressed out:=/autoseg/domain_seg/viz_compressed"
+          args="raw compressed --ros-args --remap in:=/autoseg/domain_seg/viz --remap out:=/autoseg/domain_seg/viz_compressed"
           if="$(eval '&quot;$(var pipeline)&quot; == &quot;domain_seg&quot;')"/>
 
     <node pkg="image_transport" exec="republish" name="viz_compressor_3d"
-          args="raw in:=/auto3d/scene_3d/viz compressed out:=/auto3d/scene_3d/viz_compressed"
+          args="raw compressed --ros-args --remap in:=/auto3d/scene_3d/viz --remap out:=/auto3d/scene_3d/viz_compressed"
           if="$(eval '&quot;$(var pipeline)&quot; == &quot;scene_3d&quot;')"/>
   </group>
 
